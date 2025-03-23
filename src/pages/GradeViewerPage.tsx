@@ -3,11 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGradeStore } from "../store/gradeStore";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { WeightInput } from "../components/ui/weight-input";
 
 const GradeViewerPage: React.FC = () => {
+  // ----- STATE AND HOOKS SECTION -----
   const { classId } = useParams<{ classId: string }>();
   const navigate = useNavigate();
   const {
@@ -17,6 +18,7 @@ const GradeViewerPage: React.FC = () => {
     setLastVisited,
     availableWeights,
     addWeight,
+    addAssignment,
   } = useGradeStore();
   const { theme } = useTheme();
   const [editingField, setEditingField] = useState<{
@@ -26,6 +28,7 @@ const GradeViewerPage: React.FC = () => {
   const [isEditingClassName, setIsEditingClassName] = useState(false);
   const currentClass = classes.find((cls) => cls.id === classId);
 
+  // ----- EFFECTS SECTION -----
   useEffect(() => {
     if (classId) {
       setLastVisited(classId);
@@ -36,6 +39,7 @@ const GradeViewerPage: React.FC = () => {
     return <div>Class not found</div>;
   }
 
+  // ----- CALCULATION FUNCTIONS SECTION -----
   const calculateGrade = () => {
     // Group assignments by weight
     const weightGroups: {
@@ -96,6 +100,7 @@ const GradeViewerPage: React.FC = () => {
     });
   };
 
+  // ----- EVENT HANDLERS SECTION -----
   const handleFieldClick = (
     assignmentId: string,
     field: "name" | "date" | "weight" | "earnedScore" | "totalScore"
@@ -123,7 +128,6 @@ const GradeViewerPage: React.FC = () => {
         [field]: field === "weight" ? Number(value) : value,
       });
     }
-    handleFieldBlur();
   };
 
   const handleClassNameClick = () => {
@@ -139,13 +143,33 @@ const GradeViewerPage: React.FC = () => {
     updateClass(classId, { name: e.target.value });
   };
 
+  // ----- ADD ASSIGNMENT HANDLER -----
+  const handleAddAssignment = () => {
+    if (!classId) return;
+
+    const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
+    const defaultWeight =
+      availableWeights.length > 0 ? availableWeights[0] : 100;
+
+    addAssignment(classId, {
+      name: "New Assignment",
+      date: today,
+      weight: defaultWeight,
+      earnedScore: 0,
+      totalScore: 100,
+    });
+  };
+
+  // ----- COMPUTED VALUES SECTION -----
   const grade = calculateGrade();
   const letterGrade = getLetterGrade(grade);
   const progressColor = getProgressColor(grade);
   const emptyRingColor = theme === "dark" ? "#2d2d2d" : "#e5e7eb";
 
+  // ----- RENDER SECTION -----
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* ----- HEADER SECTION ----- */}
       <div className="relative mb-8">
         <Button
           variant="ghost"
@@ -208,7 +232,9 @@ const GradeViewerPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ----- ASSIGNMENTS LIST SECTION ----- */}
       <div className="max-w-2xl mx-auto space-y-4">
+        {/* Assignment Cards */}
         {currentClass.assignments.map((assignment) => {
           const assignmentGrade =
             (assignment.earnedScore / assignment.totalScore) * 100;
@@ -381,6 +407,19 @@ const GradeViewerPage: React.FC = () => {
             </Card>
           );
         })}
+
+        {/* Add Assignment Bar */}
+        <div className="flex flex-col items-center mt-6">
+          <div className="w-full h-px bg-gray-300 dark:bg-gray-700"></div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleAddAssignment}
+            className="mt-2 rounded-full h-10 w-10 flex items-center justify-center"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     </div>
   );

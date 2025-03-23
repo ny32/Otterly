@@ -172,7 +172,18 @@ const DashboardPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
+      <div className="mt-16 px-[43rem]">
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={() => {
+            localStorage.clear();
+            window.location.reload();
+          }}
+        >
+          Clear All
+        </Button>
+      </div>
       <AddClassModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
