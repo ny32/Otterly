@@ -21,17 +21,40 @@ const DashboardPage: React.FC = () => {
   )[0];
 
   const calculateGrade = (classData: typeof mostRecentClass) => {
-    const totalWeight = classData.assignments.reduce(
-      (sum, assignment) => sum + assignment.weight,
+    // Group assignments by weight
+    const weightGroups: {
+      [key: number]: {
+        totalEarned: number;
+        totalPossible: number;
+        weight: number;
+      };
+    } = {};
+
+    classData.assignments.forEach((assignment) => {
+      const weight = assignment.weight;
+      if (!weightGroups[weight]) {
+        weightGroups[weight] = {
+          totalEarned: 0,
+          totalPossible: 0,
+          weight: weight,
+        };
+      }
+      weightGroups[weight].totalEarned += assignment.earnedScore;
+      weightGroups[weight].totalPossible += assignment.totalScore;
+    });
+
+    const totalWeight = Object.values(weightGroups).reduce(
+      (sum, group) => sum + group.weight,
       0
     );
-    const weightedScore = classData.assignments.reduce(
-      (sum, assignment) =>
-        sum +
-        (assignment.earnedScore / assignment.totalScore) * assignment.weight,
+
+    const weightedScore = Object.values(weightGroups).reduce(
+      (sum, group) =>
+        sum + (group.totalEarned / group.totalPossible) * group.weight,
       0
     );
-    return (weightedScore / totalWeight) * 100;
+
+    return Math.round((weightedScore / totalWeight) * 10000) / 100;
   };
 
   const calculateGPA = (percentage: number): number => {

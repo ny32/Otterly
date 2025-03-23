@@ -12,7 +12,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">
-            GradeViewer
+            Gradeview 2.0
           </Link>
           <ThemeToggle />
         </div>
