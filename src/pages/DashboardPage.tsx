@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Route, useNavigate } from "react-router-dom";
 import { useGradeStore } from "../store/gradeStore";
 import { Button } from "../components/ui/button";
 import { Plus } from "lucide-react";
@@ -178,6 +178,7 @@ const DashboardPage: React.FC = () => {
           className="w-full"
           onClick={() => {
             localStorage.clear();
+            navigate("/");
             window.location.reload();
           }}
         >
