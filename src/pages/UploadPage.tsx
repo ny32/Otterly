@@ -19,16 +19,14 @@ const UploadPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">
-          Welcome to GradeViewer
+          Nothing here yet...
         </h1>
         <div className="bg-card rounded-lg shadow-lg p-6">
-          <p className="text-muted-foreground mb-6">
-            Paste your grade data below to get started.
-          </p>
+          <p className="text-muted-foreground mb-6">Paste your data below:</p>
           <form onSubmit={handleSubmit}>
             <textarea
               className="w-full h-48 p-4 border rounded-md bg-background"
-              placeholder="Paste text here..."
+              placeholder="1. Go to StudentVue Gradebook&#10;2. Select and copy the page of the class you want&#10;3. Paste here"
               value={textData}
               onChange={(e) => setTextData(e.target.value)}
             />

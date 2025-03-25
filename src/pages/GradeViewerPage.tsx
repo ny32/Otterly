@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGradeStore } from "../store/gradeStore";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, RotateCcw, RotateCw, Trash2 } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { WeightInput } from "../components/ui/weight-input";
 
@@ -19,6 +19,11 @@ const GradeViewerPage: React.FC = () => {
     availableWeights,
     addWeight,
     addAssignment,
+    deleteAssignment,
+    undo,
+    redo,
+    initializeHistory,
+    history,
   } = useGradeStore();
   const { theme } = useTheme();
   const [editingField, setEditingField] = useState<{
@@ -32,8 +37,9 @@ const GradeViewerPage: React.FC = () => {
   useEffect(() => {
     if (classId) {
       setLastVisited(classId);
+      initializeHistory(classId);
     }
-  }, [classId, setLastVisited]);
+  }, [classId, setLastVisited, initializeHistory]);
 
   if (!currentClass) {
     return <div>Class not found</div>;
@@ -100,6 +106,14 @@ const GradeViewerPage: React.FC = () => {
     });
   };
 
+  const getCurrentClassWeights = () => {
+    // Get unique weights from current class
+    const classWeights = new Set(currentClass.assignments.map((a) => a.weight));
+    // Combine with global available weights
+    const allWeights = new Set([...classWeights, ...availableWeights]);
+    return [...allWeights].sort((a, b) => a - b);
+  };
+
   // ----- EVENT HANDLERS SECTION -----
   const handleFieldClick = (
     assignmentId: string,
@@ -109,6 +123,26 @@ const GradeViewerPage: React.FC = () => {
   };
 
   const handleFieldBlur = () => {
+    if (editingField) {
+      const assignment = currentClass.assignments.find(
+        (a) => a.id === editingField.assignmentId
+      );
+      if (assignment) {
+        // Convert empty scores to 0 on blur
+        if (
+          editingField.field === "earnedScore" &&
+          assignment.earnedScore === 0
+        ) {
+          handleFieldChange(editingField.assignmentId, "earnedScore", "0");
+        }
+        if (
+          editingField.field === "totalScore" &&
+          assignment.totalScore === 0
+        ) {
+          handleFieldChange(editingField.assignmentId, "totalScore", "0");
+        }
+      }
+    }
     setEditingField(null);
   };
 
@@ -120,12 +154,23 @@ const GradeViewerPage: React.FC = () => {
     if (!classId) return;
 
     if (field === "earnedScore" || field === "totalScore") {
-      updateAssignment(classId, assignmentId, {
-        [field]: Number(value),
-      });
+      // Allow empty string but convert to 0 when saving
+      const numValue = value === "" ? 0 : Number(value);
+      if (!isNaN(numValue)) {
+        updateAssignment(classId, assignmentId, {
+          [field]: numValue,
+        });
+      }
+    } else if (field === "weight") {
+      const numValue = Number(value);
+      if (!isNaN(numValue)) {
+        updateAssignment(classId, assignmentId, {
+          weight: numValue,
+        });
+      }
     } else {
       updateAssignment(classId, assignmentId, {
-        [field]: field === "weight" ? Number(value) : value,
+        [field]: value,
       });
     }
   };
@@ -160,6 +205,23 @@ const GradeViewerPage: React.FC = () => {
     });
   };
 
+  // Add handler for deleting assignment
+  const handleDeleteAssignment = (assignmentId: string) => {
+    if (!classId) return;
+    deleteAssignment(classId, assignmentId);
+  };
+
+  // Add this function near the other handlers
+  const handleClearWeights = () => {
+    // Get weights currently in use by this class
+    const weightsInUse = new Set(currentClass.assignments.map((a) => a.weight));
+    // Update the store with only the weights in use
+    useGradeStore.setState((state) => ({
+      ...state,
+      availableWeights: [...weightsInUse],
+    }));
+  };
+
   // ----- COMPUTED VALUES SECTION -----
   const grade = calculateGrade();
   const letterGrade = getLetterGrade(grade);
@@ -168,73 +230,93 @@ const GradeViewerPage: React.FC = () => {
 
   // ----- RENDER SECTION -----
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* ----- HEADER SECTION ----- */}
-      <div className="relative mb-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <div className="flex items-center mb-6">
         <Button
           variant="ghost"
+          size="icon"
           onClick={() => navigate("/dashboard")}
-          className="absolute left-0 flex items-center gap-2"
+          className="mr-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
         </Button>
-        <div className="text-center">
+        <div className="flex-grow text-center">
           {isEditingClassName ? (
             <input
               type="text"
               value={currentClass.name}
               onChange={handleClassNameChange}
               onBlur={handleClassNameBlur}
-              className="text-3xl font-bold bg-transparent border-b border-primary focus:outline-none"
+              className="text-2xl sm:text-3xl font-bold bg-transparent border-b border-primary focus:outline-none max-w-full"
               autoFocus
             />
           ) : (
             <h1
-              className="text-3xl font-bold cursor-pointer hover:text-primary"
+              className="text-2xl sm:text-3xl font-bold cursor-pointer hover:text-primary truncate px-2"
               onClick={handleClassNameClick}
             >
               {currentClass.name}
             </h1>
           )}
-          <div className="flex items-center justify-center gap-4 mt-4">
-            <div className="relative w-48 h-48">
-              <svg className="w-full h-full" viewBox="0 0 36 36">
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke={emptyRingColor}
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke={progressColor}
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${grade}, 100`}
-                  className="transition-colors duration-300"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="flex flex-col items-center justify-center w-24 h-24 rounded-full bg-background">
-                  <div className="text-4xl font-bold">{grade.toFixed(1)}%</div>
-                  <div className="text-2xl font-semibold">{letterGrade}</div>
-                </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => undo(classId)}
+            disabled={!history[classId]?.past.length}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => redo(classId)}
+            disabled={!history[classId]?.future.length}
+          >
+            <RotateCw className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex justify-center mb-8">
+        <div className="relative w-36 h-36 sm:w-48 sm:h-48">
+          <svg className="w-full h-full" viewBox="0 0 36 36">
+            <path
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+              fill="none"
+              stroke={emptyRingColor}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            <path
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+              fill="none"
+              stroke={progressColor}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeDasharray={`${grade}, 100`}
+              className="transition-colors duration-300"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-background">
+              <div className="text-2xl sm:text-4xl font-bold">
+                {grade.toFixed(1)}%
+              </div>
+              <div className="text-xl sm:text-2xl font-semibold">
+                {letterGrade}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ----- ASSIGNMENTS LIST SECTION ----- */}
       <div className="max-w-2xl mx-auto space-y-4">
-        {/* Assignment Cards */}
         {currentClass.assignments.map((assignment) => {
           const assignmentGrade =
             (assignment.earnedScore / assignment.totalScore) * 100;
@@ -242,35 +324,48 @@ const GradeViewerPage: React.FC = () => {
           const assignmentProgressColor = getProgressColor(assignmentGrade);
 
           return (
-            <Card key={assignment.id} className="transition-all duration-200">
-              <CardContent className="p-6">
+            <Card key={assignment.id} className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeleteAssignment(assignment.id)}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col">
-                  <div className="flex justify-between items-start">
-                    {editingField?.assignmentId === assignment.id &&
-                    editingField.field === "name" ? (
-                      <input
-                        type="text"
-                        value={assignment.name}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            assignment.id,
-                            "name",
-                            e.target.value
-                          )
-                        }
-                        onBlur={handleFieldBlur}
-                        className="text-xl font-medium bg-transparent border-b border-primary focus:outline-none"
-                        autoFocus
-                      />
-                    ) : (
-                      <h3
-                        className="text-xl font-medium cursor-pointer hover:text-primary"
-                        onClick={() => handleFieldClick(assignment.id, "name")}
-                      >
-                        {assignment.name}
-                      </h3>
-                    )}
-                    <div className="relative w-20 h-20">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      {editingField?.assignmentId === assignment.id &&
+                      editingField.field === "name" ? (
+                        <input
+                          type="text"
+                          value={assignment.name}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              assignment.id,
+                              "name",
+                              e.target.value
+                            )
+                          }
+                          onBlur={handleFieldBlur}
+                          className="text-lg sm:text-xl font-medium bg-transparent border-b border-primary focus:outline-none w-full"
+                          autoFocus
+                        />
+                      ) : (
+                        <h3
+                          className="text-lg sm:text-xl font-medium cursor-pointer hover:text-primary break-words pr-4"
+                          onClick={() =>
+                            handleFieldClick(assignment.id, "name")
+                          }
+                        >
+                          {assignment.name}
+                        </h3>
+                      )}
+                    </div>
+
+                    <div className="relative w-20 h-20 ml-4 mt-8">
                       <svg className="w-full h-full" viewBox="0 0 36 36">
                         <path
                           d="M18 2.0845
@@ -294,12 +389,12 @@ const GradeViewerPage: React.FC = () => {
                         />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-background">
+                        <div className="flex flex-col items-center justify-center w-12 h-12 rounded-full bg-background">
                           {editingField?.assignmentId === assignment.id &&
                           editingField.field === "earnedScore" ? (
                             <input
                               type="number"
-                              value={assignment.earnedScore}
+                              value={assignment.earnedScore || ""}
                               onChange={(e) =>
                                 handleFieldChange(
                                   assignment.id,
@@ -308,7 +403,7 @@ const GradeViewerPage: React.FC = () => {
                                 )
                               }
                               onBlur={handleFieldBlur}
-                              className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-12 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               autoFocus
                             />
                           ) : (
@@ -326,7 +421,7 @@ const GradeViewerPage: React.FC = () => {
                           editingField.field === "totalScore" ? (
                             <input
                               type="number"
-                              value={assignment.totalScore}
+                              value={assignment.totalScore || ""}
                               onChange={(e) =>
                                 handleFieldChange(
                                   assignment.id,
@@ -335,7 +430,7 @@ const GradeViewerPage: React.FC = () => {
                                 )
                               }
                               onBlur={handleFieldBlur}
-                              className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-12 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               autoFocus
                             />
                           ) : (
@@ -352,7 +447,8 @@ const GradeViewerPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center mt-2">
+
+                  <div className="flex justify-between items-center text-sm text-muted-foreground mt-2">
                     {editingField?.assignmentId === assignment.id &&
                     editingField.field === "date" ? (
                       <input
@@ -366,17 +462,18 @@ const GradeViewerPage: React.FC = () => {
                           )
                         }
                         onBlur={handleFieldBlur}
-                        className="text-sm text-muted-foreground bg-transparent border-b border-primary focus:outline-none"
+                        className="bg-transparent border-b border-primary focus:outline-none"
                         autoFocus
                       />
                     ) : (
                       <div
-                        className="text-sm text-muted-foreground cursor-pointer hover:text-primary"
+                        className="cursor-pointer hover:text-primary"
                         onClick={() => handleFieldClick(assignment.id, "date")}
                       >
                         {formatDate(assignment.date)}
                       </div>
                     )}
+
                     {editingField?.assignmentId === assignment.id &&
                     editingField.field === "weight" ? (
                       <WeightInput
@@ -388,12 +485,14 @@ const GradeViewerPage: React.FC = () => {
                             value.toString()
                           )
                         }
-                        availableWeights={availableWeights}
+                        availableWeights={getCurrentClassWeights()}
                         onAddWeight={addWeight}
+                        onBlur={handleFieldBlur}
+                        onClearWeights={handleClearWeights}
                       />
                     ) : (
                       <div
-                        className="text-sm text-muted-foreground cursor-pointer hover:text-primary"
+                        className="cursor-pointer hover:text-primary"
                         onClick={() =>
                           handleFieldClick(assignment.id, "weight")
                         }
@@ -408,7 +507,6 @@ const GradeViewerPage: React.FC = () => {
           );
         })}
 
-        {/* Add Assignment Bar */}
         <div className="flex flex-col items-center mt-6">
           <div className="w-full h-px bg-gray-300 dark:bg-gray-700"></div>
           <Button

@@ -83,18 +83,20 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-2 gap-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Left Column */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Recent Class Card */}
           {mostRecentClass && (
             <Card>
-              <CardHeader>
-                <CardTitle>{mostRecentClass.name}</CardTitle>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-xl sm:text-2xl">
+                  {mostRecentClass.name}
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-4">
+              <CardContent className="p-4 sm:p-6 pt-0">
+                <div className="text-2xl sm:text-3xl font-bold mb-4">
                   {calculateGrade(mostRecentClass).toFixed(1)}%
                 </div>
                 <div className="space-y-2">
@@ -103,8 +105,10 @@ const DashboardPage: React.FC = () => {
                       key={assignment.id}
                       className="flex justify-between items-center py-1"
                     >
-                      <span className="text-sm">{assignment.name}</span>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm truncate mr-2">
+                        {assignment.name}
+                      </span>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {assignment.earnedScore}/{assignment.totalScore}
                       </span>
                     </div>
@@ -123,12 +127,14 @@ const DashboardPage: React.FC = () => {
 
           {/* GPA Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="text-center">
-                <div className="text-4xl font-bold">
+                <div className="text-3xl sm:text-4xl font-bold">
                   {calculateOverallGPA().toFixed(1)}
                 </div>
-                <div className="text-lg text-muted-foreground">GPA</div>
+                <div className="text-base sm:text-lg text-muted-foreground">
+                  GPA
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -136,10 +142,10 @@ const DashboardPage: React.FC = () => {
 
         {/* Right Column - All Classes */}
         <Card>
-          <CardHeader>
-            <CardTitle>All Classes</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-xl sm:text-2xl">All Classes</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-2">
               {classes.map((classData) => (
                 <div
@@ -147,8 +153,10 @@ const DashboardPage: React.FC = () => {
                   className="flex justify-between items-center py-2 border-b last:border-0 cursor-pointer hover:bg-accent/50 px-2 rounded"
                   onClick={() => navigate(`/gradeviewer/${classData.id}`)}
                 >
-                  <span className="font-medium">{classData.name}</span>
-                  <div className="flex items-center gap-2">
+                  <span className="font-medium truncate mr-2">
+                    {classData.name}
+                  </span>
+                  <div className="flex items-center gap-2 whitespace-nowrap">
                     <span className="text-muted-foreground">
                       {calculateGrade(classData).toFixed(1)}%
                     </span>
