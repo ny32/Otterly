@@ -194,8 +194,42 @@ const GradeViewerPage: React.FC = () => {
     if (!classId) return;
 
     const today = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
-    const defaultWeight =
-      availableWeights.length > 0 ? availableWeights[0] : 100;
+
+    // Get a smart default weight from existing assignments instead of always using 100%
+    let defaultWeight = 100;
+
+    // First try to use the most common weight in the current class
+    if (currentClass.assignments.length > 0) {
+      // Count frequency of weights in current class
+      const weightCounts = currentClass.assignments.reduce(
+        (counts, assignment) => {
+          counts[assignment.weight] = (counts[assignment.weight] || 0) + 1;
+          return counts;
+        },
+        {} as Record<number, number>
+      );
+
+      // Find the most common weight
+      let maxCount = 0;
+      let mostCommonWeight = 0;
+
+      Object.entries(weightCounts).forEach(([weight, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonWeight = Number(weight);
+        }
+      });
+
+      if (mostCommonWeight > 0) {
+        defaultWeight = mostCommonWeight;
+      }
+    }
+
+    // If no assignments or couldn't determine most common weight,
+    // then check available weights
+    if (defaultWeight === 100 && availableWeights.length > 0) {
+      defaultWeight = availableWeights[0];
+    }
 
     addAssignment(classId, {
       name: "New Assignment",
@@ -233,14 +267,16 @@ const GradeViewerPage: React.FC = () => {
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 mb-0 pb-0">
       <div className="flex items-center mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/dashboard")}
-          className="mr-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <div className="flex-none">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 px-2 sm:px-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm sm:text-base">Back to Dashboard</span>
+          </Button>
+        </div>
         <div className="flex-grow text-center">
           {isEditingClassName ? (
             <input
@@ -248,36 +284,19 @@ const GradeViewerPage: React.FC = () => {
               value={currentClass.name}
               onChange={handleClassNameChange}
               onBlur={handleClassNameBlur}
-              className="text-2xl sm:text-3xl font-bold bg-transparent border-b border-primary focus:outline-none max-w-full"
+              className="text-2xl sm:text-3xl font-bold bg-transparent border-b border-primary focus:outline-none max-w-full mx-auto"
               autoFocus
             />
           ) : (
             <h1
-              className="text-2xl sm:text-3xl font-bold cursor-pointer hover:text-primary truncate px-2"
+              className="text-2xl sm:text-3xl font-bold cursor-pointer hover:text-primary truncate px-2 mx-auto"
               onClick={handleClassNameClick}
             >
               {currentClass.name}
             </h1>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => undo(classId)}
-            disabled={!history[classId]?.past.length}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => redo(classId)}
-            disabled={!history[classId]?.future.length}
-          >
-            <RotateCw className="h-4 w-4" />
-          </Button>
-        </div>
+        <div className="flex-none w-[120px] sm:w-[160px]"></div>
       </div>
 
       <div className="flex justify-center mb-8">
@@ -317,7 +336,37 @@ const GradeViewerPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto space-y-4 relative">
+        <div className="absolute right-2 -top-12 flex gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => undo(classId)}
+            disabled={!history[classId]?.past.length}
+            className={`h-8 w-8 transition-all ${
+              theme === "dark"
+                ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
+                : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
+            }`}
+            title="Undo"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => redo(classId)}
+            disabled={!history[classId]?.future.length}
+            className={`h-8 w-8 transition-all ${
+              theme === "dark"
+                ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
+                : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
+            }`}
+            title="Redo"
+          >
+            <RotateCw className="h-4 w-4" />
+          </Button>
+        </div>
         {currentClass.assignments.map((assignment) => {
           const assignmentGrade =
             Math.round(
