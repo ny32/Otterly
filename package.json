@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "vite --host",
+    "build": "tsc && vite build && npm run copy-configs",
+    "copy-configs": "node -e \"const fs=require('fs');const path=require('path');const source='public';const dest='dist';fs.readdirSync(source).forEach(file=>{fs.copyFileSync(path.join(source,file),path.join(dest,file))});fs.writeFileSync('dist/_redirects','/* /index.html 200');\"",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

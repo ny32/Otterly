@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: gradeview
+    env: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /dashboard
+        destination: /index.html
+      - type: rewrite
+        source: /gradeviewer/*
+        destination: /index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html

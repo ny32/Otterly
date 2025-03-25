@@ -16,7 +16,7 @@ const UploadPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 mb-0 pb-0">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">
           Nothing here yet...
@@ -26,7 +26,7 @@ const UploadPage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <textarea
               className="w-full h-48 p-4 border rounded-md bg-background"
-              placeholder="1. Go to StudentVue Gradebook&#10;2. Select and copy the page of the class you want&#10;3. Paste here"
+              placeholder="1. Go to the StudentVue Gradebook&#10;2. Select(CTRL + A) and copy the page of the class you want&#10;3. Paste here"
               value={textData}
               onChange={(e) => setTextData(e.target.value)}
             />

@@ -1,0 +1,31 @@
+{
+  "navigationFallback": {
+    "rewrite": "index.html",
+    "exclude": [
+      "/images/*.{png,jpg,gif,ico,svg}",
+      "/css/*",
+      "/js/*",
+      "/assets/*"
+    ]
+  },
+  "routes": [
+    {
+      "route": "/dashboard",
+      "serve": "/index.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/gradeviewer/*",
+      "serve": "/index.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/*",
+      "serve": "/index.html",
+      "statusCode": 200
+    }
+  ],
+  "mimeTypes": {
+    ".json": "text/json"
+  }
+}

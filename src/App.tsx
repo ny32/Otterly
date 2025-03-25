@@ -40,6 +40,8 @@ function App() {
                 )
               }
             />
+            <Route path="/gradeviewer" element={<Navigate to="/" replace />} />
+            <Route path="/gradeviewer/" element={<Navigate to="/" replace />} />
             <Route
               path="/gradeviewer/:classId"
               element={
@@ -50,6 +52,7 @@ function App() {
                 )
               }
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
       </Router>

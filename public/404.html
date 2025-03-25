@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>GradeView</title>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages or static hosts
+      // This script redirects from a 404 page to the index.html page
+      // while preserving the URL
+      var segmentCount = 0;
+      var l = window.location;
+      l.replace(
+        l.protocol +
+          "//" +
+          l.hostname +
+          (l.port ? ":" + l.port : "") +
+          l.pathname
+            .split("/")
+            .slice(0, 1 + segmentCount)
+            .join("/") +
+          "/?p=/" +
+          l.pathname
+            .slice(1)
+            .split("/")
+            .slice(segmentCount)
+            .join("/")
+            .replace(/&/g, "~and~") +
+          (l.search ? "&q=" + l.search.slice(1).replace(/&/g, "~and~") : "") +
+          l.hash
+      );
+    </script>
+  </head>
+  <body>
+    <!-- This file is used as a 404 page but actually serves as a redirector to enable client-side routing -->
+    <h1>Redirecting...</h1>
+    <p>
+      If you are not redirected automatically, please click
+      <a href="/">here</a>.
+    </p>
+  </body>
+</html>

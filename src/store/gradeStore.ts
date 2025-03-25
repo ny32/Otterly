@@ -182,8 +182,11 @@ export const useGradeStore = create<GradeStore>()(
       },
 
       setLastVisited: (classId: string) =>
-        set(() => ({
+        set((state) => ({
           lastVisited: classId,
+          classes: state.classes.map((cls) =>
+            cls.id === classId ? { ...cls, lastVisited: Date.now() } : cls
+          ),
         })),
 
       addWeight: (weight: number) =>

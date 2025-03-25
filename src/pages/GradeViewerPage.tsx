@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { ArrowLeft, Plus, RotateCcw, RotateCw, Trash2 } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { WeightInput } from "../components/ui/weight-input";
+import { calculateGrade, getLetterGrade } from "../utils/gradeCalculator";
 
 const GradeViewerPage: React.FC = () => {
   // ----- STATE AND HOOKS SECTION -----
@@ -41,56 +42,13 @@ const GradeViewerPage: React.FC = () => {
     }
   }, [classId, setLastVisited, initializeHistory]);
 
+  // Render nothing if no current class (will redirect in effect)
   if (!currentClass) {
-    return <div>Class not found</div>;
+    navigate("/");
+    return null;
   }
 
   // ----- CALCULATION FUNCTIONS SECTION -----
-  const calculateGrade = () => {
-    // Group assignments by weight
-    const weightGroups: {
-      [key: number]: {
-        totalEarned: number;
-        totalPossible: number;
-        weight: number;
-      };
-    } = {};
-
-    currentClass.assignments.forEach((assignment) => {
-      const weight = assignment.weight;
-      if (!weightGroups[weight]) {
-        weightGroups[weight] = {
-          totalEarned: 0,
-          totalPossible: 0,
-          weight: weight,
-        };
-      }
-      weightGroups[weight].totalEarned += assignment.earnedScore;
-      weightGroups[weight].totalPossible += assignment.totalScore;
-    });
-
-    const totalWeight = Object.values(weightGroups).reduce(
-      (sum, group) => sum + group.weight,
-      0
-    );
-
-    const weightedScore = Object.values(weightGroups).reduce(
-      (sum, group) =>
-        sum + (group.totalEarned / group.totalPossible) * group.weight,
-      0
-    );
-
-    return Math.round((weightedScore / totalWeight) * 10000) / 100;
-  };
-
-  const getLetterGrade = (percentage: number): string => {
-    if (percentage >= 90) return "A";
-    if (percentage >= 80) return "B";
-    if (percentage >= 70) return "C";
-    if (percentage >= 60) return "D";
-    return "F";
-  };
-
   const getProgressColor = (percentage: number): string => {
     if (percentage >= 85) return "#24a158";
     if (percentage >= 60) return "#f2c94c";
@@ -98,12 +56,55 @@ const GradeViewerPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    try {
+      // First check if the date already includes a year with comma format like "MAR 25, 2024"
+      const commaMatch = dateString.match(
+        /^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/
+      );
+      if (commaMatch) {
+        const monthNames = [
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MAY",
+          "JUN",
+          "JUL",
+          "AUG",
+          "SEP",
+          "OCT",
+          "NOV",
+          "DEC",
+        ];
+        const month = monthNames.indexOf(commaMatch[1].toUpperCase());
+        const day = parseInt(commaMatch[2]);
+        const year = parseInt(commaMatch[3]);
+        if (month >= 0) {
+          const date = new Date(year, month, day);
+          return date.toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          });
+        }
+      }
+
+      // Handle normal date formats
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+
+      // If we can't parse it, return the original string
+      return dateString;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString;
+    }
   };
 
   const getCurrentClassWeights = () => {
@@ -223,14 +224,14 @@ const GradeViewerPage: React.FC = () => {
   };
 
   // ----- COMPUTED VALUES SECTION -----
-  const grade = calculateGrade();
+  const grade = calculateGrade(currentClass);
   const letterGrade = getLetterGrade(grade);
   const progressColor = getProgressColor(grade);
   const emptyRingColor = theme === "dark" ? "#2d2d2d" : "#e5e7eb";
 
   // ----- RENDER SECTION -----
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 mb-0 pb-0">
       <div className="flex items-center mb-6">
         <Button
           variant="ghost"
@@ -306,7 +307,7 @@ const GradeViewerPage: React.FC = () => {
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className="flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-background">
               <div className="text-2xl sm:text-4xl font-bold">
-                {grade.toFixed(1)}%
+                {grade.toFixed(2)}%
               </div>
               <div className="text-xl sm:text-2xl font-semibold">
                 {letterGrade}
@@ -319,7 +320,9 @@ const GradeViewerPage: React.FC = () => {
       <div className="max-w-2xl mx-auto space-y-4">
         {currentClass.assignments.map((assignment) => {
           const assignmentGrade =
-            (assignment.earnedScore / assignment.totalScore) * 100;
+            Math.round(
+              (assignment.earnedScore / assignment.totalScore) * 10000
+            ) / 100;
           const assignmentLetterGrade = getLetterGrade(assignmentGrade);
           const assignmentProgressColor = getProgressColor(assignmentGrade);
 
@@ -507,7 +510,7 @@ const GradeViewerPage: React.FC = () => {
           );
         })}
 
-        <div className="flex flex-col items-center mt-6">
+        <div className="flex flex-col items-center mt-4 mb-0 pb-0">
           <div className="w-full h-px bg-gray-300 dark:bg-gray-700"></div>
           <Button
             variant="ghost"

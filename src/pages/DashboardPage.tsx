@@ -10,68 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import {
+  calculateGrade,
+  getLetterGrade,
+  calculateGPA,
+} from "../utils/gradeCalculator";
+import { useTheme } from "../components/theme-provider";
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { classes } = useGradeStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const { theme } = useTheme();
 
   const mostRecentClass = [...classes].sort(
     (a, b) => (b.lastVisited || 0) - (a.lastVisited || 0)
   )[0];
-
-  const calculateGrade = (classData: typeof mostRecentClass) => {
-    // Group assignments by weight
-    const weightGroups: {
-      [key: number]: {
-        totalEarned: number;
-        totalPossible: number;
-        weight: number;
-      };
-    } = {};
-
-    classData.assignments.forEach((assignment) => {
-      const weight = assignment.weight;
-      if (!weightGroups[weight]) {
-        weightGroups[weight] = {
-          totalEarned: 0,
-          totalPossible: 0,
-          weight: weight,
-        };
-      }
-      weightGroups[weight].totalEarned += assignment.earnedScore;
-      weightGroups[weight].totalPossible += assignment.totalScore;
-    });
-
-    const totalWeight = Object.values(weightGroups).reduce(
-      (sum, group) => sum + group.weight,
-      0
-    );
-
-    const weightedScore = Object.values(weightGroups).reduce(
-      (sum, group) =>
-        sum + (group.totalEarned / group.totalPossible) * group.weight,
-      0
-    );
-
-    return Math.round((weightedScore / totalWeight) * 10000) / 100;
-  };
-
-  const calculateGPA = (percentage: number): number => {
-    if (percentage >= 90) return 4.0;
-    if (percentage >= 80) return 3.0;
-    if (percentage >= 70) return 2.0;
-    if (percentage >= 60) return 1.0;
-    return 0.0;
-  };
-
-  const getLetterGrade = (percentage: number): string => {
-    if (percentage >= 90) return "A";
-    if (percentage >= 80) return "B";
-    if (percentage >= 70) return "C";
-    if (percentage >= 60) return "D";
-    return "F";
-  };
 
   const calculateOverallGPA = () => {
     if (classes.length === 0) return 0;
@@ -82,8 +36,24 @@ const DashboardPage: React.FC = () => {
     return totalGPA / classes.length;
   };
 
+  // Color function for grade percentages
+  const getProgressColor = (percentage: number): string => {
+    if (percentage >= 85) return "#24a158";
+    if (percentage >= 60) return "#f2c94c";
+    return "#CA0B00";
+  };
+
+  // Calculate assignment percentage for color
+  const calculateAssignmentPercentage = (
+    earned: number,
+    total: number
+  ): number => {
+    if (total === 0) return 0;
+    return (earned / total) * 100;
+  };
+
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 mb-0 pb-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Left Column */}
         <div className="space-y-4 sm:space-y-6">
@@ -97,22 +67,31 @@ const DashboardPage: React.FC = () => {
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="text-2xl sm:text-3xl font-bold mb-4">
-                  {calculateGrade(mostRecentClass).toFixed(1)}%
+                  {calculateGrade(mostRecentClass).toFixed(2)}%
                 </div>
                 <div className="space-y-2">
-                  {mostRecentClass.assignments.slice(0, 6).map((assignment) => (
-                    <div
-                      key={assignment.id}
-                      className="flex justify-between items-center py-1"
-                    >
-                      <span className="text-sm truncate mr-2">
-                        {assignment.name}
-                      </span>
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        {assignment.earnedScore}/{assignment.totalScore}
-                      </span>
-                    </div>
-                  ))}
+                  {mostRecentClass.assignments.slice(0, 6).map((assignment) => {
+                    const percentage = calculateAssignmentPercentage(
+                      assignment.earnedScore,
+                      assignment.totalScore
+                    );
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="flex justify-between items-center py-1"
+                      >
+                        <span className="text-sm truncate mr-2">
+                          {assignment.name}
+                        </span>
+                        <span
+                          className="text-sm font-bold whitespace-nowrap"
+                          style={{ color: getProgressColor(percentage) }}
+                        >
+                          {assignment.earnedScore}/{assignment.totalScore}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <Button
                   variant="outline"
@@ -130,7 +109,7 @@ const DashboardPage: React.FC = () => {
             <CardContent className="p-4 sm:p-6">
               <div className="text-center">
                 <div className="text-3xl sm:text-4xl font-bold">
-                  {calculateOverallGPA().toFixed(1)}
+                  {calculateOverallGPA().toFixed(2)}
                 </div>
                 <div className="text-base sm:text-lg text-muted-foreground">
                   GPA
@@ -147,25 +126,31 @@ const DashboardPage: React.FC = () => {
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-2">
-              {classes.map((classData) => (
-                <div
-                  key={classData.id}
-                  className="flex justify-between items-center py-2 border-b last:border-0 cursor-pointer hover:bg-accent/50 px-2 rounded"
-                  onClick={() => navigate(`/gradeviewer/${classData.id}`)}
-                >
-                  <span className="font-medium truncate mr-2">
-                    {classData.name}
-                  </span>
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="text-muted-foreground">
-                      {calculateGrade(classData).toFixed(1)}%
+              {classes.map((classData) => {
+                const classGrade = calculateGrade(classData);
+                return (
+                  <div
+                    key={classData.id}
+                    className="flex justify-between items-center py-2 border-b last:border-0 cursor-pointer hover:bg-accent/50 px-2 rounded"
+                    onClick={() => navigate(`/gradeviewer/${classData.id}`)}
+                  >
+                    <span className="font-medium truncate mr-2">
+                      {classData.name}
                     </span>
-                    <span className="font-semibold">
-                      {getLetterGrade(calculateGrade(classData))}
-                    </span>
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <span className="text-muted-foreground">
+                        {classGrade.toFixed(2)}%
+                      </span>
+                      <span
+                        className="font-semibold"
+                        style={{ color: getProgressColor(classGrade) }}
+                      >
+                        {getLetterGrade(classGrade)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-4 pt-4 border-t">
               <Button
@@ -180,10 +165,10 @@ const DashboardPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-16 px-[43rem]">
+      <div className="mt-10 mb-0 pb-0 flex justify-center">
         <Button
           variant="ghost"
-          className="w-full"
+          className="max-w-md w-full mx-auto"
           onClick={() => {
             localStorage.clear();
             navigate("/");

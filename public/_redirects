@@ -1,0 +1,4 @@
+# Redirect all routes to index.html for SPA routing
+/dashboard              /index.html   200
+/gradeviewer/*          /index.html   200
+/*                      /index.html   200 

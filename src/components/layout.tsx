@@ -8,13 +8,13 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
+    <div className="flex flex-col h-full">
+      <header className="border-b flex-shrink-0">
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center">
           <Link to="/" className="text-xl font-bold whitespace-nowrap">
             GradeView 2.0
           </Link>
-          <p className="flex-grow text-center text-xs sm:text-md mr-2 sm:mr-4 truncate">
+          <p className="flex-grow text-center text-md sm:text-md mr-2 sm:mr-4 truncate">
             Link to use in school➡️ &nbsp; ❗
             <Link
               className="font-bold underline"
@@ -28,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <ThemeToggle />
         </div>
       </header>
-      <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+      <main className="flex-grow overflow-auto">{children}</main>
     </div>
   );
 };
