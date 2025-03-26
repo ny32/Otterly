@@ -69,9 +69,25 @@ function determineYear(dateString: string): string {
   return `${dateString}, ${currentYear}`;
 }
 
+// Global variable to store deleted data for modal display
+let lastDeletedData: string = "";
+
+// Getter function to access the deleted data
+export function getLastDeletedData(): string {
+  return lastDeletedData;
+}
+
 export function parseRawText(rawText: string): ClassData {
   // Case-insensitive search for Grade Book
   const gradeBookIndex = rawText.toLowerCase().indexOf("grade book");
+
+  // Extract and store any text that appears before "Grade Book"
+  if (gradeBookIndex > 0) {
+    lastDeletedData = rawText.substring(0, gradeBookIndex).trim();
+  } else {
+    lastDeletedData = "";
+  }
+
   if (gradeBookIndex === -1) {
     console.error("Could not find 'Grade Book' in raw text");
     return {

@@ -7,8 +7,8 @@ export interface Assignment {
   name: string;
   date: string;
   weight: number;
-  earnedScore: number;
-  totalScore: number;
+  earnedScore: number | string;
+  totalScore: number | string;
 }
 
 export interface ClassData {
@@ -26,11 +26,18 @@ interface HistoryState {
   };
 }
 
+interface OriginalClassState {
+  [classId: string]: ClassData;
+}
+
 interface GradeStore {
   classes: ClassData[];
   history: HistoryState;
   lastVisited: string | null;
   availableWeights: number[];
+  deletedClasses: ClassData[];
+  redoDeletedClasses: ClassData[];
+  originalClasses: OriginalClassState;
   addClass: (rawText: string) => void;
   updateClass: (id: string, data: Partial<ClassData>) => void;
   deleteClass: (id: string) => void;
@@ -46,6 +53,9 @@ interface GradeStore {
   addWeight: (weight: number) => void;
   undo: (classId: string) => void;
   redo: (classId: string) => void;
+  undoClassDeletion: () => void;
+  redoClassDeletion: () => void;
+  restoreOriginalClass: (classId: string) => void;
   initializeHistory: (classId: string) => void;
 }
 
@@ -58,6 +68,9 @@ export const useGradeStore = create<GradeStore>()(
       history: {},
       lastVisited: null,
       availableWeights: [],
+      deletedClasses: [],
+      redoDeletedClasses: [],
+      originalClasses: {},
 
       initializeHistory: (classId: string) => {
         const { classes, history } = get();
@@ -76,7 +89,6 @@ export const useGradeStore = create<GradeStore>()(
         }
       },
 
-      // Helper function to save state to history
       _saveToHistory: (classId: string, newClass: ClassData) => {
         const { history } = get();
         const classHistory = history[classId] || {
@@ -105,8 +117,16 @@ export const useGradeStore = create<GradeStore>()(
 
       addClass: (rawText: string) => {
         const newClass = parseRawText(rawText);
+
+        const originalClass = JSON.parse(JSON.stringify(newClass));
+
         set((state) => ({
           classes: [...state.classes, newClass],
+          redoDeletedClasses: [],
+          originalClasses: {
+            ...state.originalClasses,
+            [newClass.id]: originalClass,
+          },
         }));
       },
 
@@ -120,12 +140,70 @@ export const useGradeStore = create<GradeStore>()(
       },
 
       deleteClass: (id) => {
+        const classToDelete = get().classes.find((cls) => cls.id === id);
+        if (!classToDelete) return;
+
         set((state) => ({
           classes: state.classes.filter((cls) => cls.id !== id),
           history: Object.fromEntries(
             Object.entries(state.history).filter(([classId]) => classId !== id)
           ),
+          deletedClasses: [classToDelete, ...state.deletedClasses].slice(
+            0,
+            MAX_HISTORY
+          ),
+          redoDeletedClasses: [],
         }));
+      },
+
+      undoClassDeletion: () => {
+        const { deletedClasses } = get();
+        if (deletedClasses.length === 0) return;
+
+        const [classToRestore, ...remainingDeleted] = deletedClasses;
+
+        set((state) => ({
+          classes: [...state.classes, classToRestore],
+          deletedClasses: remainingDeleted,
+          redoDeletedClasses: [
+            classToRestore,
+            ...state.redoDeletedClasses,
+          ].slice(0, MAX_HISTORY),
+        }));
+      },
+
+      redoClassDeletion: () => {
+        const { redoDeletedClasses } = get();
+        if (redoDeletedClasses.length === 0) return;
+
+        const [classToDelete, ...remainingRedo] = redoDeletedClasses;
+
+        set((state) => ({
+          classes: state.classes.filter((cls) => cls.id !== classToDelete.id),
+          redoDeletedClasses: remainingRedo,
+          deletedClasses: [classToDelete, ...state.deletedClasses].slice(
+            0,
+            MAX_HISTORY
+          ),
+        }));
+      },
+
+      restoreOriginalClass: (classId: string) => {
+        const { originalClasses } = get();
+        const originalClass = originalClasses[classId];
+
+        if (!originalClass) return;
+
+        const { _saveToHistory } = get() as any;
+
+        const restoredClass = JSON.parse(JSON.stringify(originalClass));
+
+        const currentClass = get().classes.find((cls) => cls.id === classId);
+        if (currentClass && currentClass.lastVisited) {
+          restoredClass.lastVisited = currentClass.lastVisited;
+        }
+
+        _saveToHistory(classId, restoredClass);
       },
 
       updateAssignment: (classId, assignmentId, updates) => {
@@ -178,7 +256,18 @@ export const useGradeStore = create<GradeStore>()(
 
       setRawData: (data: string) => {
         const classes = data.split("\n\n\n").filter(Boolean).map(parseRawText);
-        set({ classes });
+
+        const originalClasses: OriginalClassState = {};
+        classes.forEach((cls) => {
+          originalClasses[cls.id] = JSON.parse(JSON.stringify(cls));
+        });
+
+        set({
+          classes,
+          deletedClasses: [],
+          redoDeletedClasses: [],
+          originalClasses,
+        });
       },
 
       setLastVisited: (classId: string) =>

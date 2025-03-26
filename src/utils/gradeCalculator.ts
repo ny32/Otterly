@@ -3,6 +3,16 @@ const CUTOFF_A = 89.45;
 const CUTOFF_B = 79.45;
 const CUTOFF_C = 69.45;
 const CUTOFF_D = 59.45;
+
+// Convert a potentially string value to a number safely
+export const safeNumber = (value: number | string): number => {
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return value;
+};
+
 /**
  * Calculates the weighted grade for a class based on assignment weights
  * @param classData The class data containing assignments
@@ -17,46 +27,36 @@ export const calculateGrade = (classData: ClassData): number => {
     return 0;
   }
 
-  // Group assignments by weight
-  const weightGroups: {
-    [key: number]: {
-      totalEarned: number;
-      totalPossible: number;
-      weight: number;
-    };
-  } = {};
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
 
+  const weightGroups: { [key: number]: { earned: number; total: number } } = {};
+
+  // Group assignments by weight
   classData.assignments.forEach((assignment) => {
     const weight = assignment.weight;
+    const earnedScore = safeNumber(assignment.earnedScore);
+    const totalScore = safeNumber(assignment.totalScore);
+
     if (!weightGroups[weight]) {
-      weightGroups[weight] = {
-        totalEarned: 0,
-        totalPossible: 0,
-        weight: weight,
-      };
+      weightGroups[weight] = { earned: 0, total: 0 };
     }
-    weightGroups[weight].totalEarned += assignment.earnedScore;
-    weightGroups[weight].totalPossible += assignment.totalScore;
+
+    weightGroups[weight].earned += earnedScore;
+    weightGroups[weight].total += totalScore;
   });
 
-  const totalWeight = Object.values(weightGroups).reduce(
-    (sum, group) => sum + group.weight,
-    0
-  );
+  // Calculate grade based on weight groups
+  Object.entries(weightGroups).forEach(([weight, scores]) => {
+    const weightNum = Number(weight);
+    if (scores.total > 0) {
+      const percentage = (scores.earned / scores.total) * 100;
+      totalWeightedScore += percentage * weightNum;
+      totalWeight += weightNum;
+    }
+  });
 
-  // If there are no weights (shouldn't happen with proper data), return 0
-  if (totalWeight === 0) {
-    return 0;
-  }
-
-  const weightedScore = Object.values(weightGroups).reduce((sum, group) => {
-    // Handle case where totalPossible is 0 to avoid division by zero
-    if (group.totalPossible === 0) return sum;
-    return sum + (group.totalEarned / group.totalPossible) * group.weight;
-  }, 0);
-
-  // Round to 2 decimal places
-  return Math.round((weightedScore / totalWeight) * 10000) / 100;
+  return totalWeight === 0 ? 0 : totalWeightedScore / totalWeight;
 };
 
 /**

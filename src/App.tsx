@@ -14,6 +14,11 @@ import { useGradeStore } from "./store/gradeStore";
 
 function App() {
   const classes = useGradeStore((state) => state.classes);
+  const deletedClasses = useGradeStore((state) => state.deletedClasses);
+
+  // Only redirect to upload page if both classes and deletedClasses are empty
+  const shouldShowUploadPage =
+    classes.length === 0 && deletedClasses.length === 0;
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="gradeviewer-theme">
@@ -23,7 +28,7 @@ function App() {
             <Route
               path="/"
               element={
-                classes.length === 0 ? (
+                shouldShowUploadPage ? (
                   <UploadPage />
                 ) : (
                   <Navigate to="/dashboard" replace />
@@ -33,7 +38,7 @@ function App() {
             <Route
               path="/dashboard"
               element={
-                classes.length > 0 ? (
+                !shouldShowUploadPage ? (
                   <DashboardPage />
                 ) : (
                   <Navigate to="/" replace />

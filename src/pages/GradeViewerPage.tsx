@@ -3,7 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGradeStore } from "../store/gradeStore";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { ArrowLeft, Plus, RotateCcw, RotateCw, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  Trash2,
+  RefreshCw,
+  Pencil,
+} from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { WeightInput } from "../components/ui/weight-input";
 import { calculateGrade, getLetterGrade } from "../utils/gradeCalculator";
@@ -25,6 +33,8 @@ const GradeViewerPage: React.FC = () => {
     redo,
     initializeHistory,
     history,
+    restoreOriginalClass,
+    originalClasses,
   } = useGradeStore();
   const { theme } = useTheme();
   const [editingField, setEditingField] = useState<{
@@ -115,6 +125,15 @@ const GradeViewerPage: React.FC = () => {
     return [...allWeights].sort((a, b) => a - b);
   };
 
+  // Helper function to safely convert score values to numbers
+  const safeNumber = (value: number | string): number => {
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return value || 0;
+  };
+
   // ----- EVENT HANDLERS SECTION -----
   const handleFieldClick = (
     assignmentId: string,
@@ -129,18 +148,20 @@ const GradeViewerPage: React.FC = () => {
         (a) => a.id === editingField.assignmentId
       );
       if (assignment) {
-        // Convert empty scores to 0 on blur
+        // Only validate and convert to default values on blur, not during typing
         if (
-          editingField.field === "earnedScore" &&
-          assignment.earnedScore === 0
+          editingField.field === "earnedScore" ||
+          editingField.field === "totalScore"
         ) {
-          handleFieldChange(editingField.assignmentId, "earnedScore", "0");
-        }
-        if (
-          editingField.field === "totalScore" &&
-          assignment.totalScore === 0
-        ) {
-          handleFieldChange(editingField.assignmentId, "totalScore", "0");
+          const fieldName = editingField.field;
+          const currentValue = assignment[fieldName];
+
+          // If the value is empty or NaN on blur, set it to 0
+          if (currentValue === "" || isNaN(Number(currentValue))) {
+            updateAssignment(classId, editingField.assignmentId, {
+              [fieldName]: 0,
+            });
+          }
         }
       }
     }
@@ -155,13 +176,10 @@ const GradeViewerPage: React.FC = () => {
     if (!classId) return;
 
     if (field === "earnedScore" || field === "totalScore") {
-      // Allow empty string but convert to 0 when saving
-      const numValue = value === "" ? 0 : Number(value);
-      if (!isNaN(numValue)) {
-        updateAssignment(classId, assignmentId, {
-          [field]: numValue,
-        });
-      }
+      // Allow empty strings during editing
+      updateAssignment(classId, assignmentId, {
+        [field]: value === "" ? "" : Number(value),
+      });
     } else if (field === "weight") {
       const numValue = Number(value);
       if (!isNaN(numValue)) {
@@ -257,6 +275,50 @@ const GradeViewerPage: React.FC = () => {
     }));
   };
 
+  // Handle restore to original state
+  const handleRestore = () => {
+    if (!classId) return;
+    restoreOriginalClass(classId);
+  };
+
+  // Check if there are changes to restore (only enable button if changes exist)
+  const hasChangesToRestore = () => {
+    if (!originalClasses || !originalClasses[classId] || !currentClass)
+      return false;
+
+    const originalClass = originalClasses[classId];
+
+    // Compare assignments count
+    if (originalClass.assignments.length !== currentClass.assignments.length)
+      return true;
+
+    // Compare class name
+    if (originalClass.name !== currentClass.name) return true;
+
+    // Compare assignments (deep comparison)
+    for (let i = 0; i < originalClass.assignments.length; i++) {
+      const origAssignment = originalClass.assignments[i];
+      const currAssignment = currentClass.assignments[i];
+
+      // Check if any field differs
+      if (
+        origAssignment.name !== currAssignment.name ||
+        origAssignment.date !== currAssignment.date ||
+        origAssignment.weight !== currAssignment.weight ||
+        safeNumber(origAssignment.earnedScore) !==
+          safeNumber(currAssignment.earnedScore) ||
+        safeNumber(origAssignment.totalScore) !==
+          safeNumber(currAssignment.totalScore)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const canRestore = hasChangesToRestore();
+
   // ----- COMPUTED VALUES SECTION -----
   const grade = calculateGrade(currentClass);
   const letterGrade = getLetterGrade(grade);
@@ -288,12 +350,15 @@ const GradeViewerPage: React.FC = () => {
               autoFocus
             />
           ) : (
-            <h1
-              className="text-2xl sm:text-3xl font-bold cursor-pointer hover:text-primary truncate px-2 mx-auto"
+            <div
+              className="group inline-flex items-center cursor-pointer mx-auto"
               onClick={handleClassNameClick}
             >
-              {currentClass.name}
-            </h1>
+              <h1 className="text-2xl sm:text-3xl font-bold hover:text-primary truncate px-2">
+                {currentClass.name}
+              </h1>
+              <Pencil className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+            </div>
           )}
         </div>
         <div className="flex-none w-[120px] sm:w-[160px]"></div>
@@ -337,40 +402,62 @@ const GradeViewerPage: React.FC = () => {
       </div>
 
       <div className="max-w-2xl mx-auto space-y-4 relative">
-        <div className="absolute right-2 -top-12 flex gap-2">
+        <div className="absolute w-full -top-12 flex justify-between">
+          {/* Restore button on left */}
           <Button
             variant="secondary"
-            size="icon"
-            onClick={() => undo(classId)}
-            disabled={!history[classId]?.past.length}
-            className={`h-8 w-8 transition-all ${
+            onClick={handleRestore}
+            disabled={!canRestore}
+            className={`h-8 px-3 transition-all flex items-center gap-1 ${
               theme === "dark"
-                ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
-                : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
+                ? "bg-blue-700/50 hover:bg-blue-600 hover:scale-110"
+                : "bg-blue-300/70 hover:bg-blue-400 hover:scale-110 shadow-sm"
             }`}
-            title="Undo"
+            title="Restore to original state"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" />
+            <span className="text-xs">Restore</span>
           </Button>
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => redo(classId)}
-            disabled={!history[classId]?.future.length}
-            className={`h-8 w-8 transition-all ${
-              theme === "dark"
-                ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
-                : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
-            }`}
-            title="Redo"
-          >
-            <RotateCw className="h-4 w-4" />
-          </Button>
+
+          {/* Undo/Redo buttons on right */}
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => undo(classId)}
+              disabled={!history[classId]?.past?.length}
+              className={`h-8 w-8 transition-all ${
+                theme === "dark"
+                  ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
+                  : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
+              }`}
+              title="Undo"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => redo(classId)}
+              disabled={!history[classId]?.future?.length}
+              className={`h-8 w-8 transition-all ${
+                theme === "dark"
+                  ? "bg-slate-700/50 hover:bg-slate-600 hover:scale-110"
+                  : "bg-slate-300/70 hover:bg-slate-400 hover:scale-110 shadow-sm"
+              }`}
+              title="Redo"
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+
         {currentClass.assignments.map((assignment) => {
           const assignmentGrade =
             Math.round(
-              (assignment.earnedScore / assignment.totalScore) * 10000
+              (safeNumber(assignment.earnedScore) /
+                safeNumber(assignment.totalScore)) *
+                10000
             ) / 100;
           const assignmentLetterGrade = getLetterGrade(assignmentGrade);
           const assignmentProgressColor = getProgressColor(assignmentGrade);
@@ -406,14 +493,17 @@ const GradeViewerPage: React.FC = () => {
                           autoFocus
                         />
                       ) : (
-                        <h3
-                          className="text-lg sm:text-xl font-medium cursor-pointer hover:text-primary break-words pr-4"
+                        <div
+                          className="group inline-flex items-center cursor-pointer"
                           onClick={() =>
                             handleFieldClick(assignment.id, "name")
                           }
                         >
-                          {assignment.name}
-                        </h3>
+                          <h3 className="text-lg sm:text-xl font-medium hover:text-primary break-words pr-2">
+                            {assignment.name}
+                          </h3>
+                          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       )}
                     </div>
 
@@ -446,7 +536,14 @@ const GradeViewerPage: React.FC = () => {
                           editingField.field === "earnedScore" ? (
                             <input
                               type="number"
-                              value={assignment.earnedScore || ""}
+                              value={
+                                typeof assignment.earnedScore === "string" &&
+                                assignment.earnedScore === ""
+                                  ? ""
+                                  : assignment.earnedScore === 0
+                                  ? "0"
+                                  : assignment.earnedScore
+                              }
                               onChange={(e) =>
                                 handleFieldChange(
                                   assignment.id,
@@ -460,12 +557,15 @@ const GradeViewerPage: React.FC = () => {
                             />
                           ) : (
                             <div
-                              className="text-sm font-medium cursor-pointer hover:text-primary"
+                              className="group text-center text-sm font-medium cursor-pointer hover:text-primary w-full"
                               onClick={() =>
                                 handleFieldClick(assignment.id, "earnedScore")
                               }
                             >
-                              {assignment.earnedScore}
+                              <div className="relative inline-block">
+                                {assignment.earnedScore}
+                                <Pencil className="h-2 w-2 opacity-0 group-hover:opacity-100 transition-opacity absolute -right-3 top-1" />
+                              </div>
                             </div>
                           )}
                           <div className="w-4 h-[1px] bg-gray-400 dark:bg-gray-600 my-0.5"></div>
@@ -473,7 +573,14 @@ const GradeViewerPage: React.FC = () => {
                           editingField.field === "totalScore" ? (
                             <input
                               type="number"
-                              value={assignment.totalScore || ""}
+                              value={
+                                typeof assignment.totalScore === "string" &&
+                                assignment.totalScore === ""
+                                  ? ""
+                                  : assignment.totalScore === 0
+                                  ? "0"
+                                  : assignment.totalScore
+                              }
                               onChange={(e) =>
                                 handleFieldChange(
                                   assignment.id,
@@ -487,12 +594,15 @@ const GradeViewerPage: React.FC = () => {
                             />
                           ) : (
                             <div
-                              className="text-sm font-medium cursor-pointer hover:text-primary"
+                              className="group text-center text-sm font-medium cursor-pointer hover:text-primary w-full"
                               onClick={() =>
                                 handleFieldClick(assignment.id, "totalScore")
                               }
                             >
-                              {assignment.totalScore}
+                              <div className="relative inline-block">
+                                {assignment.totalScore}
+                                <Pencil className="h-2 w-2 opacity-0 group-hover:opacity-100 transition-opacity absolute -right-3 top-1" />
+                              </div>
                             </div>
                           )}
                         </div>
@@ -519,10 +629,11 @@ const GradeViewerPage: React.FC = () => {
                       />
                     ) : (
                       <div
-                        className="cursor-pointer hover:text-primary"
+                        className="group inline-flex items-center cursor-pointer hover:text-primary"
                         onClick={() => handleFieldClick(assignment.id, "date")}
                       >
-                        {formatDate(assignment.date)}
+                        <span>{formatDate(assignment.date)}</span>
+                        <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
                       </div>
                     )}
 
@@ -544,12 +655,13 @@ const GradeViewerPage: React.FC = () => {
                       />
                     ) : (
                       <div
-                        className="cursor-pointer hover:text-primary"
+                        className="group inline-flex items-center cursor-pointer hover:text-primary"
                         onClick={() =>
                           handleFieldClick(assignment.id, "weight")
                         }
                       >
-                        {assignment.weight}%
+                        <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity mr-1" />
+                        <span>{assignment.weight}%</span>
                       </div>
                     )}
                   </div>
