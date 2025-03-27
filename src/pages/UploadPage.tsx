@@ -1,17 +1,68 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGradeStore } from "../store/gradeStore";
+import { getLastDeletedData, parseRawText } from "../utils/textParser";
+import { DeletedDataModal } from "../components/DeletedDataModal";
 
 const UploadPage: React.FC = () => {
   const [textData, setTextData] = useState("");
+  const [showDeletedDataModal, setShowDeletedDataModal] = useState(false);
+  const [deletedData, setDeletedData] = useState("");
+  const [dataProcessed, setDataProcessed] = useState(false);
   const navigate = useNavigate();
   const setRawData = useGradeStore((state) => state.setRawData);
+
+  // Navigate after data is processed and modal is closed
+  useEffect(() => {
+    if (dataProcessed && !showDeletedDataModal) {
+      navigate("/dashboard");
+    }
+  }, [dataProcessed, showDeletedDataModal, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (textData.trim()) {
-      setRawData(textData);
-      navigate("/dashboard");
+      try {
+        // When doing setRawData, the data might contain multiple classes
+        // separated by "\n\n\n". We need to parse each one to capture deleted data
+        const chunks = textData.split("\n\n\n").filter(Boolean);
+        let hasDeletedData = false;
+        let allDeletedData = "";
+
+        // Pre-parse each chunk to detect deleted data
+        chunks.forEach((chunk, index) => {
+          // Parse this chunk to trigger lastDeletedData capture
+          parseRawText(chunk);
+
+          // Check if this chunk had deleted data
+          const chunkDeletedData = getLastDeletedData();
+          if (chunkDeletedData) {
+            hasDeletedData = true;
+            allDeletedData +=
+              (allDeletedData ? "\n\n" : "") +
+              `[Class ${index + 1}] Removed Content:\n${chunkDeletedData}`;
+          }
+        });
+
+        // Process all data
+        setRawData(textData);
+        setDataProcessed(true);
+
+        // Show modal if there was deleted data
+        if (hasDeletedData) {
+          setDeletedData(allDeletedData);
+          setShowDeletedDataModal(true);
+          // Navigation will happen in useEffect when modal is closed
+        } else {
+          // If no deleted data, navigate directly (via useEffect)
+        }
+      } catch (error) {
+        console.error("Error parsing data:", error);
+        // Still process data even if there was an error
+        setRawData(textData);
+        setDataProcessed(true);
+        // Navigation will happen in useEffect
+      }
     }
   };
 
@@ -41,6 +92,16 @@ const UploadPage: React.FC = () => {
           </form>
         </div>
       </div>
+
+      {/* Deleted Data Modal */}
+      <DeletedDataModal
+        isOpen={showDeletedDataModal}
+        onClose={() => {
+          setShowDeletedDataModal(false);
+          // Navigation happens in useEffect
+        }}
+        deletedData={deletedData}
+      />
     </div>
   );
 };
